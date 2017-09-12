@@ -25,9 +25,6 @@ import org.apache.spark.{SparkConf, SparkContext, SparkEnv}
 import org.slf4j.LoggerFactory
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseRDDFunctions._
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.core.KeyFamilyQualifier
-import org.joda.time.DateTime
-
-
 /**
   * Copyright 2017, Xiaomi.
   * All rights reserved.
@@ -38,28 +35,24 @@ object Aggregator extends Serializable {
     case class Config(date: String = "2017-08-10",
                       out_put_hdfs_file:String = "hdfs://test/path"
                      )
-    val parser = new scopt.OptionParser[Config]("BasicValidatorJob") {
-        opt[String]('d', "date") optional() valueName ("<yyyy-MM-dd>") action ((x, c) =>
-            c.copy(date = x)) text ("processing date")
-        opt[String]("out_put_hdfs_file") optional() valueName ("<out_put_hdfs_file>") action ((x, c) =>
-            c.copy(out_put_hdfs_file = x)) text ("out_put_hdfs_file")
-    }
+//    val parser = new scopt.OptionParser[Config]("BasicValidatorJob") {
+//        opt[String]('d', "date") optional() valueName ("<yyyy-MM-dd>") action ((x, c) =>
+//            c.copy(date = x)) text ("processing date")
+//        opt[String]("out_put_hdfs_file") optional() valueName ("<out_put_hdfs_file>") action ((x, c) =>
+//            c.copy(out_put_hdfs_file = x)) text ("out_put_hdfs_file")
+//    }
 
     def main(args: Array[String]):Unit = {
-        parser.parse(args, Config()) match {
-            case Some(config) =>{
-                val sparkConf = new SparkConf().setAppName("Spark Codelab: WordCount in scala")
-                sparkConf.setIfMissing("spark.master", "local")
-                val sc = new SparkContext(sparkConf)
-                val aggregator = new Aggregator(sc,config)
-                val ret = aggregator.run()
-                if(ret !=0){
-                    println("Error In Aggregator")
-                }
-                System.exit(ret)
-            }
-            case _ => sys.exit(-1)
+        val sparkConf = new SparkConf().setAppName("Spark Codelab: WordCount in scala")
+        sparkConf.setIfMissing("spark.master", "local")
+        val sc = new SparkContext(sparkConf)
+        val config = new Config(args(0),args(1))
+        val aggregator = new Aggregator(sc,config)
+        val ret = aggregator.run()
+        if(ret !=0){
+            println("Error In Aggregator")
         }
+        System.exit(ret)
     }
 }
 
@@ -76,8 +69,8 @@ class Aggregator(@transient sc: SparkContext,config:Config) extends Serializable
         val hbaseMeta = new FileStatusCompJob(sc).doComp(fileIdWithObjects)
         val file_table_rdd = hbaseMeta.map(_._1)
         val meta_table_rdd = hbaseMeta.map(_._2)
-        saveFileBackToHbase(file_table_rdd)
-        saveMetaBackToHbase(meta_table_rdd)
+        //saveFileBackToHbase(file_table_rdd)
+        //saveMetaBackToHbase(meta_table_rdd)
         0
     }
     def loadDataFromHbase(): RDD[(Long, FDSObjectInfoBean)] ={
@@ -115,6 +108,8 @@ class Aggregator(@transient sc: SparkContext,config:Config) extends Serializable
         .persist(StorageLevel.MEMORY_AND_DISK)
         rdd2
     }
+
+
     def saveFileBackToHbase(fileRDD:RDD[FdsFileStatus]):Unit={
         val hbaseContext = new HBaseContext(sc,HBaseConfiguration.create())
         fileRDD.loadByRPC(

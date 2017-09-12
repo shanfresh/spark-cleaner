@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-SPARK_BIN="/Users/admin/Dev/spark2/bin"
+SPARK_BIN="/home/haxiaolin/work/fds-work/infra-client/bin/spark-submit"
 processing_date = "2017-08-09"
 $SPARK_BIN/spark-submit \
-    --class com.xiaomi.infra.galaxy.fds.spakcleaner.job.aggregate.Aggregator \
+    --class com.xiaomi.infra.galaxy.fds.spakcleaner.job.aggregate.Aggregator\
     --master local \
     --deploy-mode client \
     --num-executors 5 \
