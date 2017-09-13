@@ -43,10 +43,10 @@ object Aggregator extends Serializable {
 //    }
 
     def main(args: Array[String]):Unit = {
-        val sparkConf = new SparkConf().setAppName("Spark Codelab: WordCount in scala")
+        val sparkConf = new SparkConf().setAppName("FDS cleaner in scala")
         sparkConf.setIfMissing("spark.master", "local")
         val sc = new SparkContext(sparkConf)
-        val config = new Config(args(0),args(1))
+        val config = new Config()
         val aggregator = new Aggregator(sc,config)
         val ret = aggregator.run()
         if(ret !=0){
@@ -57,9 +57,9 @@ object Aggregator extends Serializable {
 }
 
 class Aggregator(@transient sc: SparkContext,config:Config) extends Serializable {
-    val objectTable = "hbase://c4tst-emq-staging/objectTable"
-    val fileTable = "hbase://c4tst-emq-staging/fileTable"
-    val blobTable = "hbase://c4tst-emq-staging/blobTable"
+    val objectTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_fds_object_table"
+    val fileTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_fileinfo"
+    val blobTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_blobinfo"
     @transient
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 

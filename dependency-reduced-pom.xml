@@ -334,17 +334,17 @@
         <version>${hbase.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.hbase</groupId>
+        <groupId>com.xiaomi.infra</groupId>
         <artifactId>hbase-client</artifactId>
-        <version>${hbase.version}</version>
+        <version>${infra-hbase-client.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
   <properties>
-    <hbase-client.version>1.1.5.1</hbase-client.version>
-    <java.version>1.6</java.version>
+    <infra-hbase-client.version>1.1.5.1</infra-hbase-client.version>
+    <java.version>1.8</java.version>
     <fds.version>1.16-SNAPSHOT</fds.version>
-    <hbase.version>0.94.11-mdh1.2.43.3</hbase.version>
+    <hbase.version>0.94.11-mdh1.2.42.29</hbase.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <hadoop.version>2.6.0</hadoop.version>
     <scala.version>2.10.2</scala.version>

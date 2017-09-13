@@ -7,8 +7,9 @@ import com.xiaomi.infra.galaxy.fds.cleaner.auditor.{AuditorType, BasicAuditor}
 import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.FdsFileStatus
 import com.xiaomi.infra.galaxy.fds.spakcleaner.job.compact.split.{Split, SplitManager}
-import com.xiaomi.infra.hbase.client.{HBaseClient, HException}
+import com.xiaomi.infra.hbase.client.HException
 import org.apache.commons.logging.LogFactory
+import com.xiaomi.infra.hbase.client.HBaseClient
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, SparkEnv}
 
