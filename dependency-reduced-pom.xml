@@ -2,12 +2,31 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.xiaomi.infra.galaxy.fds</groupId>
-  <artifactId>galaxy-fds-cleaner-spark</artifactId>
+  <artifactId>galaxy-fds-spark-cleaner</artifactId>
   <name>Spark FDS cleaner</name>
   <version>1.0-SNAPSHOT</version>
   <description>Galaxy FDS cleaner using spark</description>
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>appassembler-maven-plugin</artifactId>
+        <version>1.3.1</version>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>create-repository</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <repositoryLayout>flat</repositoryLayout>
+          <repositoryName>lib</repositoryName>
+          <assembleDirectory>${project.build.directory}/${project.artifactId}-${project.version}</assembleDirectory>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
@@ -71,6 +90,12 @@
           <artifactSet>
             <includes>
               <include>org.apache.hbase:hbase</include>
+              <include>com.xiaomi.infra:hbase-client</include>
+              <include>com.xiaomi.infra:*</include>
+              <include>com.xiaomi.infra.galaxy:*</include>
+              <include>com.xiaomi.infra.galaxy:galaxy-fds-core</include>
+              <include>com.xiaomi.infra.galaxy:galaxy-fds-server</include>
+              <include>com.xiaomi.infra.galaxy:galaxy-fds-offline</include>
             </includes>
           </artifactSet>
         </configuration>
@@ -135,50 +160,6 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.xiaomi.infra</groupId>
-      <artifactId>hbase-client</artifactId>
-      <version>1.1.5.1</version>
-      <scope>compile</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>jersey-core</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-json</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-server</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>xiaomi-common-zookeeper</artifactId>
-          <groupId>com.xiaomi</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>thrift</artifactId>
-          <groupId>org.apache.thrift</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hbase</artifactId>
-          <groupId>org.apache.hbase</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.xiaomi.infra.galaxy</groupId>
-      <artifactId>galaxy-hadoop-fds</artifactId>
-      <version>1.8.0</version>
-      <scope>compile</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>testng</artifactId>
-          <groupId>org.testng</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_2.10</artifactId>
       <version>1.6.1-mdh1.6.1.2</version>
@@ -195,125 +176,6 @@
       <artifactId>scalatest_2.10</artifactId>
       <version>2.2.0</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.xiaomi.infra.galaxy</groupId>
-      <artifactId>galaxy-fds-server</artifactId>
-      <version>1.16-SNAPSHOT</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>hadoop-security</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-mapreduce-client-hs</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-minicluster</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-yarn-server-nodemanager</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-yarn-server-tests</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-yarn-server-web-proxy</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-auth</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-common</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hadoop-client</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-test-framework-core</artifactId>
-          <groupId>com.sun.jersey.jersey-test-framework</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-test-framework-grizzly2</artifactId>
-          <groupId>com.sun.jersey.jersey-test-framework</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-common</artifactId>
-          <groupId>org.glassfish.jersey.core</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-server</artifactId>
-          <groupId>org.glassfish.jersey.core</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-container-grizzly2-http</artifactId>
-          <groupId>org.glassfish.jersey.containers</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-container-grizzly2-servlet</artifactId>
-          <groupId>org.glassfish.jersey.containers</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-media-moxy</artifactId>
-          <groupId>org.glassfish.jersey.media</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>throttling-client</artifactId>
-          <groupId>com.xiaomi.infra.galaxy</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-core</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-json</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-server</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>hbase</artifactId>
-          <groupId>org.apache.hbase</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>servlet-api</artifactId>
-          <groupId>javax.servlet</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>grizzly-framework</artifactId>
-          <groupId>org.glassfish.grizzly</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>httpclient</artifactId>
-          <groupId>org.apache.httpcomponents</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.xiaomi.infra.galaxy</groupId>
-      <artifactId>galaxy-fds-offline</artifactId>
-      <version>1.16-SNAPSHOT</version>
-      <scope>compile</scope>
     </dependency>
   </dependencies>
   <dependencyManagement>
