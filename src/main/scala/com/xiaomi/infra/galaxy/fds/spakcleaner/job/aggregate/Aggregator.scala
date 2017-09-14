@@ -4,10 +4,8 @@ import java.io.{ByteArrayOutputStream, DataOutputStream}
 import java.util.Date
 
 import com.xiaomi.infra.galaxy.blobstore.hadoop.BlobInfoDao
-import com.xiaomi.infra.galaxy.blobstore.utils.CodecUtil
 import com.xiaomi.infra.galaxy.fds.cleaner.dao.hbase.{HBaseAggregatedFileInfoDao, HBaseAggregatedFileMetaDao}
 import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
-import com.xiaomi.infra.galaxy.fds.model.FDSObjectMetadata
 import com.xiaomi.infra.galaxy.fds.server.FDSConfigKeys
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{BlobInfoBean, FDSObjectInfoBean, FdsFileStatus}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHbaseWrapper
