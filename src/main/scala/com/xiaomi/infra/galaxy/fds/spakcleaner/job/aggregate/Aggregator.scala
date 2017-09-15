@@ -1,6 +1,6 @@
 package com.xiaomi.infra.galaxy.fds.spakcleaner.job.aggregate
 
-import java.io.{ByteArrayOutputStream, DataOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, DataOutputStream}
 import java.util.Date
 
 import com.xiaomi.infra.galaxy.blobstore.hadoop.BlobInfoDao
@@ -18,6 +18,7 @@ import org.apache.hadoop.hbase.client.{Result, Scan}
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat
 import org.apache.hadoop.hbase.util.{Base64, Bytes}
+import org.apache.hadoop.io.Writable
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
@@ -53,6 +54,24 @@ object Aggregator extends Serializable {
     }
 }
 
+object WritableSerDerUtils {
+    def serialize(writable: Writable): Array[Byte] = {
+        val out = new ByteArrayOutputStream()
+        val dataOut = new DataOutputStream(out)
+        writable.write(dataOut)
+        dataOut.close()
+        out.toByteArray
+    }
+
+    def deserialize(bytes: Array[Byte], writable: Writable): Writable = {
+        val in = new ByteArrayInputStream(bytes)
+        val dataIn = new DataInputStream(in)
+        writable.readFields(dataIn)
+        dataIn.close()
+        writable
+    }
+}
+
 class Aggregator(@transient sc: SparkContext) extends Serializable {
     val objectTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_fds_object_table"
     val fileTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_fileinfo"
@@ -61,7 +80,7 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 
     def run(): Int = {
-        val fileIdWithObjects = loadDataFromHbase()
+        val fileIdWithObjects = loadDataFromHBase(sc)
         println(s"Total FDS FileInfo Size:${fileIdWithObjects.count()}")
         val hbaseMeta = new FileStatusCompJob(sc).doComp(fileIdWithObjects)
         val file_table_rdd = hbaseMeta.map(_._1)
@@ -71,9 +90,10 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
         0
     }
 
-    def loadDataFromHbase(): RDD[(Long, FDSObjectInfoBean)] = {
+    def loadDataFromHBase(@transient sc: SparkContext): RDD[(Long, FDSObjectInfoBean)] = {
         val scan = new Scan()
-        val conf = HBaseConfiguration.create()
+        val conf = HBaseConfiguration.create(sc.hadoopConfiguration)
+        val confBytes = sc.broadcast(WritableSerDerUtils.serialize(conf))
         conf.setLong("job.start.timestamp", new Date().getTime)
         scan.addFamily(HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY)
         conf.set(TableInputFormat.INPUT_TABLE, objectTable)
@@ -95,8 +115,11 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
             .filter(_._2 != null).filter(_._2 != "").filter(_._3 != 0)
             .mapPartitions(x => {
                 val conf = HBaseConfiguration.create()
-                conf.set(TableInputFormat.INPUT_TABLE, blobTable)
+                WritableSerDerUtils.deserialize(confBytes.value, conf)
+                conf.set("hbase.cluster.name", "c4tst-galaxy-staging");
+                conf.set("galaxy.hbase.table.prefix", "c4tst_galaxy_staging_");
                 val client = new HBaseClient(conf)
+                conf.set(TableInputFormat.INPUT_TABLE, blobTable)
                 val blobInfoDao = new BlobInfoDao(client)
                 x.map { case (objectKey, uri, size) => {
                     val blobInfo = blobInfoDao.getBlobInfo(uri)
