@@ -14,7 +14,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, SparkEnv}
 
 /**
-  * Created by shanjixi on 17/8/21.
+  * Created by haxiaolin on 17/8/21.
   */
 class FDSCompactJob(@transient sparkContext: SparkContext) extends Serializable{
     private val LOG = LogFactory.getLog(classOf[FDSCompactJob])

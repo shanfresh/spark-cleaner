@@ -7,7 +7,7 @@ import org.apache.commons.logging.Log
 import org.apache.commons.logging.LogFactory
 import org.apache.hadoop.hbase.HBaseConfiguration
 /**
-  * Created by shanjixi on 17/8/20.
+  * Created by haxiaolin on 17/8/20.
   */
 object HBaseRDDFunctions
 {

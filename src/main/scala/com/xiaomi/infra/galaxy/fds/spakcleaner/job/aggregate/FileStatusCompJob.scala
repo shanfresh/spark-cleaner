@@ -14,7 +14,7 @@ import org.apache.spark.storage.StorageLevel
 import org.apache.hadoop.fs.Path
 
 /**
-  * Created by shanjixi on 17/8/10.
+  * Created by haxiaolin on 17/8/10.
   */
 class FileStatusCompJob(@transient sc: SparkContext) extends Serializable {
     val archiveBucketname= FDSConfigKeys.GALAXY_FDS_CLEANER_ARCHIVE_BUCKET_NAME_DEFAULT

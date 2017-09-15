@@ -3,7 +3,7 @@ package com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.core
 import org.apache.hadoop.hbase.util.Bytes
 
 /**
-  * Created by shanjixi on 17/8/20.
+  * Created by haxiaolin on 17/8/20.
   */
 class KeyFamilyQualifier(val rowKey:Array[Byte], val family:Array[Byte], val qualifier:Array[Byte])
         extends Comparable[KeyFamilyQualifier] with Serializable {

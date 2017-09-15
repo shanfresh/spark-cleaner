@@ -6,7 +6,7 @@ import java.util.Comparator
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.Partitioner
 /**
-  * Created by shanjixi on 17/8/20.
+  * Created by haxiaolin on 17/8/20.
   */
 class BulkLoadPartitioner(startKeys:Array[Array[Byte]]) extends Partitioner {
     // when table not exist, startKeys = Byte[0][]

@@ -4,7 +4,7 @@ import com.xiaomi.infra.galaxy.fds.spakcleaner.basic.SharedSparkContext
 import org.scalatest.FunSuite
 
 /**
-  * Created by shanjixi on 17/9/13.
+  * Created by haxiaolin on 17/9/13.
   */
 class TestAggregator extends FunSuite with SharedSparkContext{
     test("test initializing spark context") {

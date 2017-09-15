@@ -6,7 +6,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.spark.rdd.RDD
 
 /**
-  * Created by shanjixi on 17/8/20.
+  * Created by haxiaolin on 17/8/20.
   */
 class HBaseSparkWriter {
     def _getConf(): Configuration = {

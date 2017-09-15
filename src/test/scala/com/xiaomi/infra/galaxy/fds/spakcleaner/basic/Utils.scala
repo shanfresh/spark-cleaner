@@ -10,7 +10,7 @@ import org.eclipse.jetty.util.MultiException
 import scala.reflect.ClassTag
 
 /**
-  * Created by shanjixi on 17/9/13.
+  * Created by haxiaolin on 17/9/13.
   */
 
 object Utils extends Logging {

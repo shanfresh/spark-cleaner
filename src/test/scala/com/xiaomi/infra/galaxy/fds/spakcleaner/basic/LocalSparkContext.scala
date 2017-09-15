@@ -4,7 +4,7 @@ import org.apache.spark.{SparkContext}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 /**
-  * Created by shanjixi on 17/9/13.
+  * Created by haxiaolin on 17/9/13.
   */
 trait LocalSparkContext extends BeforeAndAfterEach with BeforeAndAfterAll { self: Suite =>
 

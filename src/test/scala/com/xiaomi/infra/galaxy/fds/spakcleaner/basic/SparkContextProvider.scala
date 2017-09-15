@@ -3,7 +3,7 @@ package com.xiaomi.infra.galaxy.fds.spakcleaner.basic
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
-  * Created by shanjixi on 17/9/13.
+  * Created by haxiaolin on 17/9/13.
   */
 trait SparkContextProvider {
     def sc: SparkContext

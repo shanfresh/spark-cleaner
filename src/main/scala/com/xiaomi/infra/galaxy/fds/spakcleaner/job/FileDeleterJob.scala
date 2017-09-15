@@ -5,7 +5,7 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 
 /**
-  * Created by shanjixi on 17/8/10.
+  * Created by haxiaolin on 17/8/10.
   */
 class FileDeleterJob(start_time:DateTime) extends Serializable{
     def deleteFile(file_rdd:RDD[FdsFileStatus]):Boolean={

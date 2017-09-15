@@ -4,7 +4,7 @@ import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 /**
-  * Created by shanjixi on 17/9/13.
+  * Created by haxiaolin on 17/9/13.
   */
 trait SharedSparkContext extends BeforeAndAfterAll with SparkContextProvider {
     self: Suite =>

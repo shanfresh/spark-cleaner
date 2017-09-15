@@ -4,7 +4,7 @@ import com.xiaomi.infra.galaxy.blobstore.hadoop.FileManager
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.FdsFileStatus
 
 /**
-  * Created by shanjixi on 17/9/12.
+  * Created by haxiaolin on 17/9/12.
   */
 case class Split(fileStatus: List[FdsFileStatus]=List.empty){
     var size = 0L

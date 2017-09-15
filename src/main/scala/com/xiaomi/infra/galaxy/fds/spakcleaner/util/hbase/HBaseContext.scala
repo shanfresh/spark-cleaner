@@ -8,7 +8,7 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SerializableWritable, SparkContext}
 /**
-  * Created by shanjixi on 17/8/20.
+  * Created by haxiaolin on 17/8/20.
   */
 class HBaseContext(@transient sc: SparkContext,
                    @transient val config: Configuration) extends Serializable{
