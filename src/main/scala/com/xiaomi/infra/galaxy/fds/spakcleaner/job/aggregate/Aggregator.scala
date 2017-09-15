@@ -74,6 +74,7 @@ object WritableSerDerUtils {
 }
 
 class Aggregator(@transient sc: SparkContext) extends Serializable {
+    import Aggregator.LOG
     val objectTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_fds_object_table"
     val fileTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_fileinfo"
     val blobTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_blobinfo"
@@ -124,11 +125,18 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
                 val blobInfoDao = new BlobInfoDao(client)
                 x.map { case (objectKey, uri, size) => {
                     val blobInfo = blobInfoDao.getBlobInfo(uri)
-                    val blobInfoBean = BlobInfoBean(blobInfo.getFileId, blobInfo.getBlobId, blobInfo.getStart, blobInfo.getLen)
-                    blobInfo.getFileId -> FDSObjectInfoBean(objectKey, size, blobInfoBean)
+                    if(blobInfo==null){
+                        LOG.info("INVALID URL"+uri)
+                        None
+                    }else{
+                        val blobInfoBean = BlobInfoBean(blobInfo.getFileId, blobInfo.getBlobId, blobInfo.getStart, blobInfo.getLen)
+                        Some(blobInfo.getFileId -> FDSObjectInfoBean(objectKey, size, blobInfoBean))
+                    }
                 }
                 }
             })
+            .filter(_.isDefined)
+            .map(_.get)
             .persist(StorageLevel.MEMORY_AND_DISK)
         rdd2
     }
