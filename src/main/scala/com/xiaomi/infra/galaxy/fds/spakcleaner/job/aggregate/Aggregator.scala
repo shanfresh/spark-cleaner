@@ -84,6 +84,7 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
     def run(): Int = {
         val fileIdWithObjects = loadDataFromHBase(sc)
         println(s"Total FDS FileInfo Size:${fileIdWithObjects.count()}")
+        println(s"Success get blobinfo:"+ )
         val hbaseMeta = new FileStatusCompJob(sc).doComp(fileIdWithObjects)
         val file_table_rdd = hbaseMeta.map(_._1)
         val meta_table_rdd = hbaseMeta.map(_._2)
@@ -96,6 +97,9 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
         val scan = new Scan()
         val conf = HBaseConfiguration.create(sc.hadoopConfiguration)
         val confBytes = sc.broadcast(WritableSerDerUtils.serialize(conf))
+
+        val b_getBlobInfo_success_counter = sc.accumulator(0L)
+        val b_getBlobInfo_fail_counter = sc.accumulator(0L)
         conf.setLong("job.start.timestamp", new Date().getTime)
         scan.addFamily(HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY)
         conf.set(TableInputFormat.INPUT_TABLE, objectTable)
@@ -127,8 +131,10 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
                     val blobInfo = blobInfoDao.getBlobInfo(uri)
                     if(blobInfo==null){
                         LOG.info("INVALID URL"+uri)
+                        b_getBlobInfo_fail_counter.add(1L)
                         None
                     }else{
+                        b_getBlobInfo_success_counter.add(1L)
                         val blobInfoBean = BlobInfoBean(blobInfo.getFileId, blobInfo.getBlobId, blobInfo.getStart, blobInfo.getLen)
                         Some(blobInfo.getFileId -> FDSObjectInfoBean(objectKey, size, blobInfoBean))
                     }
@@ -138,6 +144,9 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
             .filter(_.isDefined)
             .map(_.get)
             .persist(StorageLevel.MEMORY_AND_DISK)
+
+            LOG.info("Success GetBlobinfo Count:" + b_getBlobInfo_success_counter.value)
+            LOG.info("Fail    GetBlobinfo Count:" + b_getBlobInfo_fail_counter.value)
         rdd2
     }
 
