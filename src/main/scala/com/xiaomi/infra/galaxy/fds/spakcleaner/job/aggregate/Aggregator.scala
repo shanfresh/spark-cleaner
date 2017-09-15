@@ -73,7 +73,7 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
 
     def loadDataFromHbase(): RDD[(Long, FDSObjectInfoBean)] = {
         val scan = new Scan()
-        val conf = HBaseConfiguration.create()
+        val conf = HBaseConfiguration.create(sc.hadoopConfiguration)
         conf.setLong("job.start.timestamp", new Date().getTime)
         scan.addFamily(HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY)
         conf.set(TableInputFormat.INPUT_TABLE, objectTable)
