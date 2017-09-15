@@ -9,6 +9,7 @@ import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
 import com.xiaomi.infra.galaxy.fds.server.FDSConfigKeys
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{BlobInfoBean, FDSObjectInfoBean, FdsFileStatus}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHbaseWrapper
+import com.xiaomi.infra.galaxy.fds.spakcleaner.util.common.WritableSerDerUtils
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseContext
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseRDDFunctions._
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.core.KeyFamilyQualifier
@@ -78,6 +79,9 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
         scan.addFamily(HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY)
         conf.set(TableInputFormat.INPUT_TABLE, objectTable)
         conf.set(TableInputFormat.SCAN, convertScanToString(scan))
+
+        val b_HbaseConfBytes = sc.broadcast(WritableSerDerUtils.serialize(conf))
+
         val hbaseRDD = sc.newAPIHadoopRDD(conf, classOf[TableInputFormat],
             classOf[ImmutableBytesWritable],
             classOf[Result])
@@ -94,9 +98,10 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
         })
             .filter(_._2 != null).filter(_._2 != "").filter(_._3 != 0)
             .mapPartitions(x => {
-                val conf = HBaseConfiguration.create()
-                conf.set(TableInputFormat.INPUT_TABLE, blobTable)
-                val client = new HBaseClient(conf)
+                val conf2 = HBaseConfiguration.create()
+                WritableSerDerUtils.deserialize(b_HbaseConfBytes.value, conf2)
+                conf2.set(TableInputFormat.INPUT_TABLE, blobTable)
+                val client = new HBaseClient(conf2)
                 val blobInfoDao = new BlobInfoDao(client)
                 x.map { case (objectKey, uri, size) => {
                     val blobInfo = blobInfoDao.getBlobInfo(uri)
