@@ -9,7 +9,6 @@ import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
 import com.xiaomi.infra.galaxy.fds.server.FDSConfigKeys
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{BlobInfoBean, FDSObjectInfoBean, FdsFileStatus}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHbaseWrapper
-import com.xiaomi.infra.galaxy.fds.spakcleaner.util.common.WritableSerDerUtils
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseContext
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseRDDFunctions._
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.core.KeyFamilyQualifier
@@ -121,8 +120,8 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
             .mapPartitions(x => {
                 val conf = HBaseConfiguration.create()
                 WritableSerDerUtils.deserialize(confBytes.value, conf)
-                conf.set("hbase.cluster.name", "c4tst-galaxy-staging");
-                conf.set("galaxy.hbase.table.prefix", "c4tst_galaxy_staging_");
+                conf.set("hbase.cluster.name", "c4tst-galaxy-staging")
+                conf.set("galaxy.hbase.table.prefix", "c4tst_galaxy_staging_")
                 val client = new HBaseClient(conf)
                 conf.set(TableInputFormat.INPUT_TABLE, blobTable)
                 val blobInfoDao = new BlobInfoDao(client)
