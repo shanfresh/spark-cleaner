@@ -106,7 +106,7 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
             classOf[ImmutableBytesWritable],
             classOf[Result])
 
-        val rdd2 = hbaseRDD.map(data => {
+        val rdd2 = hbaseRDD.flatMap(data => {
             val objectKey = Bytes toString data._1.get()
             val uri = Bytes.toString(data._2.getValue(
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
@@ -114,7 +114,10 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
             val size = Bytes.toLong(data._2.getValue(
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
                 HBaseFDSObjectDao.SIZE_QUALIFIER))
-            (objectKey, uri, size)
+            val urlList = uri.split(",")
+            urlList.map(smallUri=>
+                (objectKey, smallUri,size)
+            )
         })
             .filter(_._2 != null).filter(_._2 != "").filter(_._3 != 0)
             .mapPartitions(x => {
@@ -149,11 +152,8 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
     }
 
 
-    def saveFileBackToHbase(fileRDD: RDD[FdsFileStatus]): Unit = {
-        val hbaseContext = new HBaseContext(sc, HBaseConfiguration.create())
-        fileRDD.loadByRPC(
-            hbaseContext,
-            fileTable,
+    def saveFileBackToHDFS(fileRDD: RDD[FdsFileStatus]): Unit = {
+
             (fdsFileStatus: FdsFileStatus) => {
                 val rowKey = Bytes.toBytes(fdsFileStatus.file_id)
                 val family = HBaseAggregatedFileInfoDao.BASIC_INFO_COLUMN_FAMILY
@@ -168,10 +168,9 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
                 }
                 }
             }
-        )
     }
 
-    def saveMetaBackToHbase(metaRDD: RDD[List[FDSObjectHbaseWrapper]]): Unit = {
+    def saveMetaBackToHDFS(metaRDD: RDD[List[FDSObjectHbaseWrapper]]): Unit = {
         val hbaseContext = new HBaseContext(sc, HBaseConfiguration.create())
         val metaTable = sc.getConf.get(FDSConfigKeys.GALAXY_FDS_CLEANER_AGGREGATOR_META_TABLE_KEY)
         metaRDD.loadByRPC(
