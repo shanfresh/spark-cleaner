@@ -154,7 +154,7 @@ class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) exten
 
     def saveFileBackToHDFS(fileRDD: RDD[FdsFileStatus]): Boolean = {
         import sqlContext.implicits._
-        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path,date_time_str)
+        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path,config.date)
         val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path,LOG)
         if(!path_is_ready)
             return false;
@@ -168,7 +168,7 @@ class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) exten
 
     def saveMetaBackToHDFS(metaRDD: RDD[List[FDSObjectHDFSWrapper]]): Boolean = {
         import sqlContext.implicits._
-        val path = HDFSPathFinder.getAggergatorFileMetaByDate(config.fds_file_cleaner_base_path,date_time_str)
+        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path,config.date)
         val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path,LOG)
         if(!path_is_ready)
             return false;

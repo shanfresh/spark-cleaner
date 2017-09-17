@@ -11,4 +11,4 @@ $SPARK_BIN/spark-submit \
     --executor-cores 2 \
     ../target/galaxy-fds-cleaner-spark-1.0-SNAPSHOT-jar-with-dependencies.jar \
     --cluster_name ${cluster_name} \
-    --fds_file_cleaner_base_path "hdfs://${cluster_name}/home/operator/fdscleaner/aggregator"
+    --fds_file_cleaner_base_path "hdfs://${cluster_name}/home/operator/fdscleaner/aggregator/"
