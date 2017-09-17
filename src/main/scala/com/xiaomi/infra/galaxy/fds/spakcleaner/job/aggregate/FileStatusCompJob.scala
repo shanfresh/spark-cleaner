@@ -5,7 +5,7 @@ import com.xiaomi.infra.galaxy.fds.cleaner.dao.hbase.HBaseAggregatedFileMetaDao
 import com.xiaomi.infra.galaxy.fds.cleaner.utils.CleanerUtils
 import com.xiaomi.infra.galaxy.fds.server.FDSConfigKeys
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{FDSObjectInfoBean, FdsFileStatus}
-import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHbaseWrapper
+import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHDFSWrapper
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
@@ -25,7 +25,7 @@ class FileStatusCompJob(@transient sc: SparkContext) extends Serializable {
     private def isArchive(fDSObjectInfoBean: FDSObjectInfoBean):Boolean ={
         fDSObjectInfoBean.objectKey.startsWith(archiveBucketname + "/")
     }
-    private def getFileStatus(file_id:Long,list:Vector[FDSObjectInfoBean]):(FdsFileStatus,List[FDSObjectHbaseWrapper])={
+    private def getFileStatus(file_id:Long,list:Vector[FDSObjectInfoBean]):(FdsFileStatus,List[FDSObjectHDFSWrapper])={
         import util.control.Breaks._
         var allBeanArchived = true
         var remainSize:Long = 0L
@@ -52,18 +52,18 @@ class FileStatusCompJob(@transient sc: SparkContext) extends Serializable {
         val hbaseObjectList = list
                 .filter(bean=> !isArchive(bean))
                 .map(bean=>{
-                    val metaRowKey: Array[Byte] = Bytes.toBytes(file_id.toString + HBaseAggregatedFileMetaDao.KEY_DELIMITER + bean.blobInfo.blobId)
-                    FDSObjectHbaseWrapper(metaRowKey,bean.objectKey,bean.blobInfo.start,bean.blobInfo.length)
+                    val metaRowKey = file_id.toString + HBaseAggregatedFileMetaDao.KEY_DELIMITER + bean.blobInfo.blobId
+                    FDSObjectHDFSWrapper(metaRowKey,bean.objectKey,bean.blobInfo.start,bean.blobInfo.length)
                 }).toList
         (fileStatus,hbaseObjectList)
     }
 
-    def doComp(source:RDD[(Long,FDSObjectInfoBean)]):RDD[(FdsFileStatus,List[FDSObjectHbaseWrapper])] ={
+    def doComp(source:RDD[(Long,FDSObjectInfoBean)]):RDD[(FdsFileStatus,List[FDSObjectHDFSWrapper])] ={
         val file_status_rdd = source
                 .groupByKey()
                 .map { case (key, objectList) => {
-                    val (fileStatus, hbaseList) = getFileStatus(key, objectList.toVector)
-                    (fileStatus, hbaseList)
+                    val (fileStatus, fdsObjectList) = getFileStatus(key, objectList.toVector)
+                    (fileStatus, fdsObjectList)
                 }}
                 .persist(StorageLevel.MEMORY_AND_DISK)
         file_status_rdd

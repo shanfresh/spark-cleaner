@@ -2,7 +2,7 @@
 SPARK_BIN="/home/haxiaolin/work/fds-work/infra-client/bin/spark-submit"
 cluster_name="hbase_cluster_name"
 $SPARK_BIN/spark-submit \
-    --class com.xiaomi.infra.galaxy.fds.spakcleaner.job.aggregate.Aggregator\
+    --class com.xiaomi.infra.galaxy.fds.spakcleaner.job.compact.FDSCompactJob\
     --master local \
     --deploy-mode client \
     --num-executors 5 \

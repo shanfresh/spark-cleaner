@@ -4,14 +4,12 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, Da
 import java.util.Date
 
 import com.xiaomi.infra.galaxy.blobstore.hadoop.BlobInfoDao
-import com.xiaomi.infra.galaxy.fds.cleaner.dao.hbase.{HBaseAggregatedFileInfoDao, HBaseAggregatedFileMetaDao}
 import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
-import com.xiaomi.infra.galaxy.fds.server.FDSConfigKeys
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{BlobInfoBean, FDSObjectInfoBean, FdsFileStatus}
-import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHbaseWrapper
-import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseContext
-import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.HBaseRDDFunctions._
-import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.core.KeyFamilyQualifier
+import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHDFSWrapper
+import com.xiaomi.infra.galaxy.fds.spakcleaner.job.HDFSPathFinder
+import com.xiaomi.infra.galaxy.fds.spakcleaner.job.bean.{FDSCleanerBasicConfig, FDSCleanerBasicConfigParser}
+import com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS.PathEnsurenceHelper
 import com.xiaomi.infra.hbase.client.HBaseClient
 import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.{Result, Scan}
@@ -30,27 +28,24 @@ import org.slf4j.LoggerFactory
   * Author: haxiaolin@xiaomi.com
   */
 object Aggregator extends Serializable {
+    val date_time_formatter = "yyyy-MM-dd"
     @transient val LOG = LoggerFactory.getLogger(classOf[Aggregator])
-    //    case class Config(date: String = "2017-08-10",
-    //                      out_put_hdfs_file:String = "hdfs://test/path"
-    //                     )
-    //    val parser = new scopt.OptionParser[Config]("BasicValidatorJob") {
-    //        opt[String]('d', "date") optional() valueName ("<yyyy-MM-dd>") action ((x, c) =>
-    //            c.copy(date = x)) text ("processing date")
-    //        opt[String]("out_put_hdfs_file") optional() valueName ("<out_put_hdfs_file>") action ((x, c) =>
-    //            c.copy(out_put_hdfs_file = x)) text ("out_put_hdfs_file")
-    //    }
 
     def main(args: Array[String]): Unit = {
         val sparkConf = new SparkConf().setAppName("FDS cleaner in scala")
         sparkConf.setIfMissing("spark.master", "local[2]")
         val sc = new SparkContext(sparkConf)
-        val aggregator = new Aggregator(sc)
-        val ret = aggregator.run()
-        if (ret != 0) {
-            println("Error In Aggregator")
+        FDSCleanerBasicConfigParser.parser.parse(args,new FDSCleanerBasicConfig()) match{
+            case Some(config) => {
+                val aggregator = new Aggregator(sc,config)
+                val ret = aggregator.run()
+                System.exit(ret)
+            }
+            case _=>{
+                LOG.error("Unrecognize Input Main Mehod Arguments:"+args.mkString(" "))
+                System.exit(-1)
+            }
         }
-        System.exit(ret)
     }
 }
 
@@ -72,13 +67,14 @@ object WritableSerDerUtils {
     }
 }
 
-class Aggregator(@transient sc: SparkContext) extends Serializable {
-    import Aggregator.LOG
-    val objectTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_fds_object_table"
-    val fileTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_fileinfo"
-    val blobTable = "hbase://c4tst-galaxy-staging/c4tst_galaxy_staging_galaxy_blobstore_hadoop_blobinfo"
+class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) extends Serializable {
+    import Aggregator._
+    val objectTable = s"hbase://${config.cluster_name}/${config.cluster_name}_fds_object_table"
+    //val fileTable = s"hbase://${config.cluster_name}/${config.cluster_name}_galaxy_blobstore_hadoop_fileinfo"
+    val blobTable = s"hbase://${config.cluster_name}/${config.cluster_name}_galaxy_blobstore_hadoop_blobinfo"
     @transient
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+    val date_time_str = config.date.toString(date_time_formatter)
 
     def run(): Int = {
         val fileIdWithObjects = loadDataFromHBase(sc)
@@ -86,9 +82,13 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
         val hbaseMeta = new FileStatusCompJob(sc).doComp(fileIdWithObjects)
         val file_table_rdd = hbaseMeta.map(_._1)
         val meta_table_rdd = hbaseMeta.map(_._2)
-        //saveFileBackToHbase(file_table_rdd)
-        //saveMetaBackToHbase(meta_table_rdd)
-        0
+
+        val fds_file_status_save_flag = saveFileBackToHDFS(file_table_rdd)
+        val fds_file_meta_save_flag = saveMetaBackToHDFS(meta_table_rdd)
+        if(fds_file_status_save_flag && fds_file_meta_save_flag)
+            return 0
+        else
+            return -1
     }
 
     def loadDataFromHBase(@transient sc: SparkContext): RDD[(Long, FDSObjectInfoBean)] = {
@@ -123,8 +123,8 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
             .mapPartitions(x => {
                 val conf = HBaseConfiguration.create()
                 WritableSerDerUtils.deserialize(confBytes.value, conf)
-                conf.set("hbase.cluster.name", "c4tst-galaxy-staging")
-                conf.set("galaxy.hbase.table.prefix", "c4tst_galaxy_staging_")
+                conf.set("hbase.cluster.name", config.cluster_name)
+                conf.set("galaxy.hbase.table.prefix", s"${config.cluster_name}_")
                 val client = new HBaseClient(conf)
                 conf.set(TableInputFormat.INPUT_TABLE, blobTable)
                 val blobInfoDao = new BlobInfoDao(client)
@@ -152,46 +152,33 @@ class Aggregator(@transient sc: SparkContext) extends Serializable {
     }
 
 
-    def saveFileBackToHDFS(fileRDD: RDD[FdsFileStatus]): Unit = {
-
-            (fdsFileStatus: FdsFileStatus) => {
-                val rowKey = Bytes.toBytes(fdsFileStatus.file_id)
-                val family = HBaseAggregatedFileInfoDao.BASIC_INFO_COLUMN_FAMILY
-                val map = Map[Array[Byte], Array[Byte]](
-                    HBaseAggregatedFileInfoDao.SIZE_QUALIFIER -> Bytes.toBytes(fdsFileStatus.remainSize),
-                    HBaseAggregatedFileInfoDao.EMPTY_PERCENT_QUALIFIER -> Bytes.toBytes(fdsFileStatus.emptyPercent),
-                    HBaseAggregatedFileInfoDao.PATH_QUALIFIER -> Bytes.toBytes(fdsFileStatus.path),
-                    HBaseAggregatedFileInfoDao.DELETED_QUALIFIER -> Bytes.toBytes(fdsFileStatus.deleted)
-                )
-                map.map { case (qualifier, values) => {
-                    (new KeyFamilyQualifier(rowKey, family, qualifier), values)
-                }
-                }
-            }
+    def saveFileBackToHDFS(fileRDD: RDD[FdsFileStatus]): Boolean = {
+        import sqlContext.implicits._
+        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path,date_time_str)
+        val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path,LOG)
+        if(!path_is_ready)
+            return false;
+        fileRDD
+            .toDF()
+            .write
+            .parquet(path)
+        LOG.info(s"Save File Status Info HDFS successfully,path:${path}")
+        return true;
     }
 
-    def saveMetaBackToHDFS(metaRDD: RDD[List[FDSObjectHbaseWrapper]]): Unit = {
-        val hbaseContext = new HBaseContext(sc, HBaseConfiguration.create())
-        val metaTable = sc.getConf.get(FDSConfigKeys.GALAXY_FDS_CLEANER_AGGREGATOR_META_TABLE_KEY)
-        metaRDD.loadByRPC(
-            hbaseContext,
-            metaTable,
-            (metaList: List[FDSObjectHbaseWrapper]) => {
-                val family = HBaseAggregatedFileMetaDao.BASIC_INFO_COLUMN_FAMILY
-                metaList.flatMap(fdsObjectItem => {
-                    val metaRowKey = fdsObjectItem.meatRowKey
-                    val map = Map[Array[Byte], Array[Byte]](
-                        HBaseAggregatedFileMetaDao.OBJECT_KEY_QUALIFIER -> Bytes.toBytes(fdsObjectItem.objectKey),
-                        HBaseAggregatedFileMetaDao.START_QUALIFIER -> Bytes.toBytes(fdsObjectItem.start),
-                        HBaseAggregatedFileMetaDao.LENGTH_QUALIFIER -> Bytes.toBytes(fdsObjectItem.length)
-                    )
-                    map.map { case (qualifier, values) => {
-                        (new KeyFamilyQualifier(metaRowKey, family, qualifier), values)
-                    }
-                    }.toIterator
-                })
-            }
-        )
+    def saveMetaBackToHDFS(metaRDD: RDD[List[FDSObjectHDFSWrapper]]): Boolean = {
+        import sqlContext.implicits._
+        val path = HDFSPathFinder.getAggergatorFileMetaByDate(config.fds_file_cleaner_base_path,date_time_str)
+        val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path,LOG)
+        if(!path_is_ready)
+            return false;
+        metaRDD
+            .flatMap(list=>list)
+            .toDF
+            .write
+            .parquet(path)
+        LOG.info(s"Save File Meta Info HDFS successfully,path:${path}")
+        return true
     }
 
     def convertScanToString(scan: Scan): String = {
