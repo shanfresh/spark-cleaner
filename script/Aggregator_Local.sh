@@ -1,14 +1,17 @@
-#!/usr/bin/env bash
-SPARK_BIN="/home/haxiaolin/work/fds-work/infra-client/bin/spark-submit"
-cluster_name="hbase_cluster_name"
+SPARK_BIN="/home/haxiaolin/infra-client/bin"
+hbase_cluster_name="c4tst-galaxy-staging"
+yarn_cluster_name="c4tst-staging"
 $SPARK_BIN/spark-submit \
-    --class com.xiaomi.infra.galaxy.fds.spakcleaner.job.aggregate.Aggregator\
-    --master local \
-    --deploy-mode client \
-    --num-executors 5 \
-    --driver-memory 2g \
-    --executor-memory 4g \
-    --executor-cores 2 \
-    ../target/galaxy-fds-cleaner-spark-1.0-SNAPSHOT-jar-with-dependencies.jar \
-    --cluster_name ${cluster_name} \
-    --fds_file_cleaner_base_path "hdfs://${cluster_name}/home/operator/fdscleaner/aggregator/"
+    --cluster ${yarn_cluster_name}  \
+    --class com.xiaomi.infra.galaxy.fds.spakcleaner.job.aggregate.Aggregator \
+    --master yarn-cluster \
+    --hbase "hbase://${hbase_cluster_name}" \
+    --num-executors 3 \
+    --driver-memory 4g \
+    --executor-memory 2g \
+    --executor-cores 1 \
+    --properties-file local.conf \
+    galaxy-fds-spark-cleaner-1.0-SNAPSHOT.jar \
+    --fds_file_cleaner_base_path "hdfs://${yarn_cluster_name}/home/operator/fdscleaner/aggregator/" \
+    --hbase_cluster_name ${hbase_cluster_name} \
+    --yarn_cluster_name ${yarn_cluster_name}

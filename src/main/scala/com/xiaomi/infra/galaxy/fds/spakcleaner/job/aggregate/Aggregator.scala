@@ -35,14 +35,14 @@ object Aggregator extends Serializable {
         val sparkConf = new SparkConf().setAppName("FDS cleaner in scala")
         sparkConf.setIfMissing("spark.master", "local[2]")
         val sc = new SparkContext(sparkConf)
-        FDSCleanerBasicConfigParser.parser.parse(args,new FDSCleanerBasicConfig()) match{
+        FDSCleanerBasicConfigParser.parser.parse(args, new FDSCleanerBasicConfig()) match {
             case Some(config) => {
-                val aggregator = new Aggregator(sc,config)
+                val aggregator = new Aggregator(sc, config)
                 val ret = aggregator.run()
                 System.exit(ret)
             }
-            case _=>{
-                LOG.error("Unrecognize Input Main Mehod Arguments:"+args.mkString(" "))
+            case _ => {
+                LOG.error("Unrecognize Input Main Mehod Arguments:" + args.mkString(" "))
                 System.exit(-1)
             }
         }
@@ -67,11 +67,13 @@ object WritableSerDerUtils {
     }
 }
 
-class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) extends Serializable {
+class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) extends Serializable {
+
     import Aggregator._
-    val objectTable = s"hbase://${config.cluster_name}/${config.cluster_name}_fds_object_table"
+
+    val objectTable = s"hbase://${config.hbase_cluster_name}/${config.hbase_cluster_name}_fds_object_table"
     //val fileTable = s"hbase://${config.cluster_name}/${config.cluster_name}_galaxy_blobstore_hadoop_fileinfo"
-    val blobTable = s"hbase://${config.cluster_name}/${config.cluster_name}_galaxy_blobstore_hadoop_blobinfo"
+    val blobTable = s"hbase://${config.hbase_cluster_name}/${config.hbase_cluster_name}_galaxy_blobstore_hadoop_blobinfo"
     @transient
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     val date_time_str = config.date.toString(date_time_formatter)
@@ -85,7 +87,7 @@ class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) exten
 
         val fds_file_status_save_flag = saveFileBackToHDFS(file_table_rdd)
         val fds_file_meta_save_flag = saveMetaBackToHDFS(meta_table_rdd)
-        if(fds_file_status_save_flag && fds_file_meta_save_flag)
+        if (fds_file_status_save_flag && fds_file_meta_save_flag)
             return 0
         else
             return -1
@@ -115,26 +117,26 @@ class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) exten
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
                 HBaseFDSObjectDao.SIZE_QUALIFIER))
             val urlList = uri.split(",")
-            urlList.map(smallUri=>
-                (objectKey, smallUri,size)
+            urlList.map(smallUri =>
+                (objectKey, smallUri, size)
             )
         })
             .filter(_._2 != null).filter(_._2 != "").filter(_._3 != 0)
             .mapPartitions(x => {
                 val conf = HBaseConfiguration.create()
                 WritableSerDerUtils.deserialize(confBytes.value, conf)
-                conf.set("hbase.cluster.name", config.cluster_name)
-                conf.set("galaxy.hbase.table.prefix", s"${config.cluster_name}_")
+                conf.set("hbase.cluster.name", config.hbase_cluster_name)
+                conf.set("galaxy.hbase.table.prefix", s"${config.hbase_cluster_name}_")
                 val client = new HBaseClient(conf)
                 conf.set(TableInputFormat.INPUT_TABLE, blobTable)
                 val blobInfoDao = new BlobInfoDao(client)
                 x.map { case (objectKey, uri, size) => {
                     val blobInfo = blobInfoDao.getBlobInfo(uri)
-                    if(blobInfo==null){
-                        LOG.info("INVALID URL"+uri)
+                    if (blobInfo == null) {
+                        LOG.info("INVALID URL" + uri)
                         b_getBlobInfo_fail_counter.add(1L)
                         None
-                    }else{
+                    } else {
                         b_getBlobInfo_success_counter.add(1L)
                         val blobInfoBean = BlobInfoBean(blobInfo.getFileId, blobInfo.getBlobId, blobInfo.getStart, blobInfo.getLen)
                         Some(blobInfo.getFileId -> FDSObjectInfoBean(objectKey, size, blobInfoBean))
@@ -146,34 +148,34 @@ class Aggregator(@transient sc: SparkContext,config:FDSCleanerBasicConfig) exten
             .map(_.get)
             .persist(StorageLevel.MEMORY_AND_DISK)
 
-            LOG.info("Success GetBlobinfo Count:" + b_getBlobInfo_success_counter.value)
-            LOG.info("Fail    GetBlobinfo Count:" + b_getBlobInfo_fail_counter.value)
+        LOG.info("Success GetBlobinfo Count:" + b_getBlobInfo_success_counter.value)
+        LOG.info("Fail    GetBlobinfo Count:" + b_getBlobInfo_fail_counter.value)
         rdd2
     }
 
 
     def saveFileBackToHDFS(fileRDD: RDD[FdsFileStatus]): Boolean = {
         import sqlContext.implicits._
-        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path,config.date)
-        val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path,LOG)
-        if(!path_is_ready)
-            return false;
+        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path, config.date)
+        val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path, LOG)
+        if (!path_is_ready)
+            return false
         fileRDD
             .toDF()
             .write
             .parquet(path)
         LOG.info(s"Save File Status Info HDFS successfully,path:${path}")
-        return true;
+        return true
     }
 
     def saveMetaBackToHDFS(metaRDD: RDD[List[FDSObjectHDFSWrapper]]): Boolean = {
         import sqlContext.implicits._
-        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path,config.date)
-        val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path,LOG)
-        if(!path_is_ready)
-            return false;
+        val path = HDFSPathFinder.getAggergatorFileStatusByDate(config.fds_file_cleaner_base_path, config.date)
+        val path_is_ready = PathEnsurenceHelper.EnsureOutputFolder(path, LOG)
+        if (!path_is_ready)
+            return false
         metaRDD
-            .flatMap(list=>list)
+            .flatMap(list => list)
             .toDF
             .write
             .parquet(path)
