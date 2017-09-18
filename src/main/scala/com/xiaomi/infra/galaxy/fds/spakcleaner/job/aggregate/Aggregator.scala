@@ -113,27 +113,28 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
             classOf[ImmutableBytesWritable],
             classOf[Result])
 
-        val rdd2 = hbaseRDD.flatMap(data => {
+        val rdd2 = hbaseRDD.map(data => {
+            val objectKeyBytes = data._1.get()
             val uriBytes = data._2.getValue(
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
                 HBaseFDSObjectDao.URI_QUALIFIER)
             val sizeBytes = data._2.getValue(
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
                 HBaseFDSObjectDao.SIZE_QUALIFIER)
-            if (uriBytes != null && uriBytes.length != 0
-                && sizeBytes != null && sizeBytes.length != 0) {
-                val objectKey = Bytes toString data._1.get()
-                val uri = Bytes.toString(uriBytes)
-                val size = Bytes.toLong(sizeBytes)
+            (objectKeyBytes, uriBytes, sizeBytes)
+        })
+            .filter(_._2 != null).filter(_._2.nonEmpty)
+            .filter(_._3 != null).filter(_._3.nonEmpty)
+            .flatMap(filteredData => {
+                val objectKey = Bytes toString filteredData._1
+                val uri = Bytes.toString(filteredData._2)
+                val size = Bytes.toLong(filteredData._3)
                 val urlList = uri.split(",")
                 urlList.map(smallUri =>
                     (objectKey, smallUri, size)
                 )
-            } else {
-                None
-            }
-        })
-            .filter(_._2 != null).filter(_._2 != "").filter(_._3 != 0)
+            })
+            .filter(_._2 != "").filter(_._3 != 0)
             .mapPartitions(x => {
                 val conf = HBaseConfiguration.create()
                 WritableSerDerUtils.deserialize(confBytes.value, conf)
