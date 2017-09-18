@@ -159,7 +159,6 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
             })
             .filter(_.isDefined)
             .map(_.get)
-            .persist(StorageLevel.MEMORY_AND_DISK)
 
         LOG.info("Success GetBlobinfo Count:" + b_getBlobInfo_success_counter.value)
         LOG.info("Fail    GetBlobinfo Count:" + b_getBlobInfo_fail_counter.value)

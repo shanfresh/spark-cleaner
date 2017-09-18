@@ -9,7 +9,7 @@ ${SPARK_BIN}/spark-submit
 --num-executors 3
 --driver-memory 4g
 --executor-memory 2g
---executor-cores 1
+--executor-cores 2
 --properties-file local.conf
 ~/spark-cleaner/galaxy-fds-spark-cleaner-1.0-SNAPSHOT.jar
 --hbase_cluster_name ${HBASE_CLUSTER_NAME}
