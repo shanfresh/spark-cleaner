@@ -71,14 +71,16 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
 
     import Aggregator._
 
-    val objectTable = s"hbase://${config.hbase_cluster_name}/${config.hbase_cluster_name}_fds_object_table"
+    val table_prefix = getTablePrefix(config.hbase_cluster_name)
+    val objectTable = s"hbase://${config.hbase_cluster_name}/${table_prefix}_fds_object_table"
     //val fileTable = s"hbase://${config.cluster_name}/${config.cluster_name}_galaxy_blobstore_hadoop_fileinfo"
-    val blobTable = s"hbase://${config.hbase_cluster_name}/${config.hbase_cluster_name}_galaxy_blobstore_hadoop_blobinfo"
+    val blobTable = s"hbase://${config.hbase_cluster_name}/${table_prefix}_galaxy_blobstore_hadoop_blobinfo"
     @transient
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     val date_time_str = config.date.toString(date_time_formatter)
 
     def run(): Int = {
+        LOG.info("object table name is: " + objectTable)
         val fileIdWithObjects = loadDataFromHBase(sc)
         println(s"Total FDS FileInfo Size:${fileIdWithObjects.count()}")
         val hbaseMeta = new FileStatusCompJob(sc).doComp(fileIdWithObjects)
@@ -93,40 +95,50 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
             return -1
     }
 
+    def getTablePrefix(hbase_cluster_name: String): String = {
+        hbase_cluster_name.replaceAll("-", "_")
+    }
+
     def loadDataFromHBase(@transient sc: SparkContext): RDD[(Long, FDSObjectInfoBean)] = {
         val scan = new Scan()
         val conf = HBaseConfiguration.create(sc.hadoopConfiguration)
-        val confBytes = sc.broadcast(WritableSerDerUtils.serialize(conf))
-
         val b_getBlobInfo_success_counter = sc.accumulator(0L)
         val b_getBlobInfo_fail_counter = sc.accumulator(0L)
         conf.setLong("job.start.timestamp", new Date().getTime)
         scan.addFamily(HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY)
         conf.set(TableInputFormat.INPUT_TABLE, objectTable)
         conf.set(TableInputFormat.SCAN, convertScanToString(scan))
+        val confBytes = sc.broadcast(WritableSerDerUtils.serialize(conf))
         val hbaseRDD = sc.newAPIHadoopRDD(conf, classOf[TableInputFormat],
             classOf[ImmutableBytesWritable],
             classOf[Result])
 
         val rdd2 = hbaseRDD.flatMap(data => {
-            val objectKey = Bytes toString data._1.get()
-            val uri = Bytes.toString(data._2.getValue(
+            val uriBytes = data._2.getValue(
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
-                HBaseFDSObjectDao.URI_QUALIFIER))
-            val size = Bytes.toLong(data._2.getValue(
+                HBaseFDSObjectDao.URI_QUALIFIER)
+            val sizeBytes = data._2.getValue(
                 HBaseFDSObjectDao.BASIC_INFO_COLUMN_FAMILY,
-                HBaseFDSObjectDao.SIZE_QUALIFIER))
-            val urlList = uri.split(",")
-            urlList.map(smallUri =>
-                (objectKey, smallUri, size)
-            )
+                HBaseFDSObjectDao.SIZE_QUALIFIER)
+            if (uriBytes != null && uriBytes.length != 0
+                && sizeBytes != null && sizeBytes.length != 0) {
+                val objectKey = Bytes toString data._1.get()
+                val uri = Bytes.toString(uriBytes)
+                val size = Bytes.toLong(sizeBytes)
+                val urlList = uri.split(",")
+                urlList.map(smallUri =>
+                    (objectKey, smallUri, size)
+                )
+            } else {
+                None
+            }
         })
             .filter(_._2 != null).filter(_._2 != "").filter(_._3 != 0)
             .mapPartitions(x => {
                 val conf = HBaseConfiguration.create()
                 WritableSerDerUtils.deserialize(confBytes.value, conf)
                 conf.set("hbase.cluster.name", config.hbase_cluster_name)
-                conf.set("galaxy.hbase.table.prefix", s"${config.hbase_cluster_name}_")
+                conf.set("galaxy.hbase.table.prefix", s"${getTablePrefix(config.hbase_cluster_name)}_")
                 val client = new HBaseClient(conf)
                 conf.set(TableInputFormat.INPUT_TABLE, blobTable)
                 val blobInfoDao = new BlobInfoDao(client)
