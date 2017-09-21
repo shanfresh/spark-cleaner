@@ -7,6 +7,7 @@ import com.xiaomi.infra.galaxy.blobstore.hadoop.BlobInfoDao
 import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{BlobInfoBean, FDSObjectInfoBean, FdsFileStatus}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHDFSWrapper
+import com.xiaomi.infra.galaxy.fds.spakcleaner.job.HabaseConfigurationManager
 import com.xiaomi.infra.galaxy.fds.spakcleaner.job.bean.{FDSCleanerBasicConfig, FDSCleanerBasicConfigParser}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS.{HDFSPathFinder, PathEnsurenceHelper}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.TableHelper
@@ -78,6 +79,8 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
 
     def run(): Int = {
         LOG.info("object table name is: " + objectTable)
+        val conf = HabaseConfigurationManager.getHBaseConfiguration(sc)
+
         val fileIdWithObjects = loadDataFromHBase(sc)
         println(s"Total FDS FileInfo Size:${fileIdWithObjects.count()}")
         val hbaseMeta = new FileInfoManager(sc, config).doComp(fileIdWithObjects)
@@ -92,7 +95,7 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
             return -1
     }
 
-    def loadDataFromHBase(@transient sc: SparkContext): RDD[(Long, FDSObjectInfoBean)] = {
+    def loadDataFromHBase(@transient sc: SparkContext,sampling_rate:Double=1): RDD[(Long, FDSObjectInfoBean)] = {
         val scan = new Scan()
         val conf = HBaseConfiguration.create(sc.hadoopConfiguration)
         val b_getBlobInfo_success_counter = sc.accumulator(0L)
@@ -151,6 +154,7 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
                 }
             })
             .filter(_.isDefined)
+            .sample(false,0.01)
             .map(_.get)
 
         LOG.info("Success GetBlobinfo Count:" + b_getBlobInfo_success_counter.value)

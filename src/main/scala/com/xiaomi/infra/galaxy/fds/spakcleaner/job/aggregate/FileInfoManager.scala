@@ -6,13 +6,16 @@ import com.xiaomi.infra.galaxy.fds.cleaner.utils.CleanerUtils
 import com.xiaomi.infra.galaxy.fds.server.FDSConfigKeys
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{FDSObjectInfoBean, FdsFileStatus}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHDFSWrapper
+import com.xiaomi.infra.galaxy.fds.spakcleaner.job.HabaseConfigurationManager
 import com.xiaomi.infra.galaxy.fds.spakcleaner.job.bean.FDSCleanerBasicConfig
 import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.TableHelper
 import com.xiaomi.infra.hbase.client.HBaseClient
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -24,15 +27,26 @@ import org.apache.spark.storage.StorageLevel
 class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig) extends Serializable {
     val archiveBucketName = FDSConfigKeys.GALAXY_FDS_CLEANER_ARCHIVE_BUCKET_NAME_DEFAULT
     val fileTable: String = TableHelper.getWholeTableName(config.hbase_cluster_name, "galaxy_blobstore_hadoop_fileinfo")
-
+    val b_hbase_configurations = serializeBroudcastConfigurationBytes()
     def isArchive(fDSObjectInfoBean: FDSObjectInfoBean): Boolean = {
         fDSObjectInfoBean.objectKey.startsWith(archiveBucketName + "/")
+    }
+    def serializeBroudcastConfigurationBytes():Broadcast[Array[Byte]]={
+        val conf = HabaseConfigurationManager.getHBaseConfiguration(sc)
+        val confBytes = sc.broadcast(WritableSerDerUtils.serialize(conf))
+        confBytes
+    }
+    def deserializeHbaseConfiguration():Configuration={
+        val conf = HBaseConfiguration.create()
+        WritableSerDerUtils.deserialize(b_hbase_configurations.value, conf)
+        conf
     }
 
     def getFileStatus(file_id: Long, list: Vector[FDSObjectInfoBean]): (FdsFileStatus, List[FDSObjectHDFSWrapper]) = {
         import util.control.Breaks._
         var allBeanArchived = true
         var remainSize: Long = 0L
+        val hbase_cluster_confguration = deserializeHbaseConfiguration()
         for (info <- list) {
             breakable {
                 if (info.objectKey.startsWith(archiveBucketName + "/"))
@@ -41,11 +55,10 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
                 remainSize += info.blobInfo.length
             }
         }
-        val conf = HBaseConfiguration.create(sc.hadoopConfiguration)
-        conf.set("hbase.cluster.name", config.hbase_cluster_name)
-        conf.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
-        val client = new HBaseClient(conf)
-        conf.set(TableInputFormat.INPUT_TABLE, fileTable)
+        hbase_cluster_confguration.set("hbase.cluster.name", config.hbase_cluster_name)
+        hbase_cluster_confguration.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
+        hbase_cluster_confguration.set(TableInputFormat.INPUT_TABLE, fileTable)
+        val client = new HBaseClient(hbase_cluster_confguration)
         val fileInfoDao = new FileInfoDao(client)
         val path: Path = fileInfoDao.getFile(file_id).getPath
 
