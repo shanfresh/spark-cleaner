@@ -7,9 +7,9 @@ import com.xiaomi.infra.galaxy.blobstore.hadoop.{BlobInfoDao, FileInfoDao, FileM
 import com.xiaomi.infra.galaxy.fds.cleaner.auditor.{AuditorType, BasicAuditor}
 import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.FdsFileStatus
-import com.xiaomi.infra.galaxy.fds.spakcleaner.job.HDFSPathFinder
 import com.xiaomi.infra.galaxy.fds.spakcleaner.job.compact.FDSCompactJob.FDSCleanerCompactorConfig
 import com.xiaomi.infra.galaxy.fds.spakcleaner.job.compact.split.{Split, SplitManager}
+import com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS.HDFSPathFinder
 import com.xiaomi.infra.hbase.client.HException
 import com.xiaomi.infra.hbase.client.HBaseClient
 import org.apache.spark.rdd.RDD

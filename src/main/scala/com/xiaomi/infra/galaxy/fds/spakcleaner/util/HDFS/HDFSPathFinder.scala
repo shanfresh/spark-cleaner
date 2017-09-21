@@ -1,4 +1,4 @@
-package com.xiaomi.infra.galaxy.fds.spakcleaner.job
+package com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS
 
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory

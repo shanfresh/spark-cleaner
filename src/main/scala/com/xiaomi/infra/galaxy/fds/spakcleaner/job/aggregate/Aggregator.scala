@@ -7,9 +7,9 @@ import com.xiaomi.infra.galaxy.blobstore.hadoop.BlobInfoDao
 import com.xiaomi.infra.galaxy.fds.dao.hbase.HBaseFDSObjectDao
 import com.xiaomi.infra.galaxy.fds.spakcleaner.bean.{BlobInfoBean, FDSObjectInfoBean, FdsFileStatus}
 import com.xiaomi.infra.galaxy.fds.spakcleaner.hbase.FDSObjectHDFSWrapper
-import com.xiaomi.infra.galaxy.fds.spakcleaner.job.HDFSPathFinder
 import com.xiaomi.infra.galaxy.fds.spakcleaner.job.bean.{FDSCleanerBasicConfig, FDSCleanerBasicConfigParser}
-import com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS.PathEnsurenceHelper
+import com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS.{HDFSPathFinder, PathEnsurenceHelper}
+import com.xiaomi.infra.galaxy.fds.spakcleaner.util.hbase.TableHelper
 import com.xiaomi.infra.hbase.client.HBaseClient
 import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.{Result, Scan}
@@ -18,7 +18,6 @@ import org.apache.hadoop.hbase.mapreduce.TableInputFormat
 import org.apache.hadoop.hbase.util.{Base64, Bytes}
 import org.apache.hadoop.io.Writable
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 import org.slf4j.LoggerFactory
 
@@ -71,10 +70,8 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
 
     import Aggregator._
 
-    val table_prefix = getTablePrefix(config.hbase_cluster_name)
-    val objectTable = s"hbase://${config.hbase_cluster_name}/${table_prefix}_fds_object_table"
-    //val fileTable = s"hbase://${config.cluster_name}/${config.cluster_name}_galaxy_blobstore_hadoop_fileinfo"
-    val blobTable = s"hbase://${config.hbase_cluster_name}/${table_prefix}_galaxy_blobstore_hadoop_blobinfo"
+    val objectTable = TableHelper.getWholeTableName(config.hbase_cluster_name, "fds_object_table")
+    val blobTable = TableHelper.getWholeTableName(config.hbase_cluster_name, "galaxy_blobstore_hadoop_blobinfo")
     @transient
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     val date_time_str = config.date.toString(date_time_formatter)
@@ -83,7 +80,7 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
         LOG.info("object table name is: " + objectTable)
         val fileIdWithObjects = loadDataFromHBase(sc)
         println(s"Total FDS FileInfo Size:${fileIdWithObjects.count()}")
-        val hbaseMeta = new FileStatusCompJob(sc).doComp(fileIdWithObjects)
+        val hbaseMeta = new FileInfoManager(sc, config).doComp(fileIdWithObjects)
         val file_table_rdd = hbaseMeta.map(_._1)
         val meta_table_rdd = hbaseMeta.map(_._2)
 
@@ -93,10 +90,6 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
             return 0
         else
             return -1
-    }
-
-    def getTablePrefix(hbase_cluster_name: String): String = {
-        hbase_cluster_name.replaceAll("-", "_")
     }
 
     def loadDataFromHBase(@transient sc: SparkContext): RDD[(Long, FDSObjectInfoBean)] = {
@@ -139,7 +132,7 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
                 val conf = HBaseConfiguration.create()
                 WritableSerDerUtils.deserialize(confBytes.value, conf)
                 conf.set("hbase.cluster.name", config.hbase_cluster_name)
-                conf.set("galaxy.hbase.table.prefix", s"${getTablePrefix(config.hbase_cluster_name)}_")
+                conf.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
                 val client = new HBaseClient(conf)
                 conf.set(TableInputFormat.INPUT_TABLE, blobTable)
                 val blobInfoDao = new BlobInfoDao(client)
@@ -164,7 +157,6 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
         LOG.info("Fail    GetBlobinfo Count:" + b_getBlobInfo_fail_counter.value)
         rdd2
     }
-
 
     def saveFileBackToHDFS(fileRDD: RDD[FdsFileStatus]): Boolean = {
         import sqlContext.implicits._

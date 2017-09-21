@@ -1,6 +1,6 @@
 package com.xiaomi.infra.galaxy.fds.spakcleaner.job.compactor
 
-import com.xiaomi.infra.galaxy.fds.spakcleaner.job.HDFSPathFinder
+import com.xiaomi.infra.galaxy.fds.spakcleaner.util.HDFS.HDFSPathFinder
 import org.junit.{Assert, Test}
 
 /**
