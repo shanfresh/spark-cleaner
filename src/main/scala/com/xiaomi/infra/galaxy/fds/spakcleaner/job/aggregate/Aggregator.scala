@@ -84,6 +84,7 @@ class Aggregator(@transient sc: SparkContext, config: FDSCleanerBasicConfig) ext
         val fileIdWithObjects = loadDataFromHBase(sc)
         println(s"Total FDS FileInfo Size:${fileIdWithObjects.count()}")
         val hbaseMeta = new FileInfoManager(sc, config).doComp(fileIdWithObjects)
+        hbaseMeta.persist()
         val file_table_rdd = hbaseMeta.map(_._1)
         val meta_table_rdd = hbaseMeta.map(_._2)
 

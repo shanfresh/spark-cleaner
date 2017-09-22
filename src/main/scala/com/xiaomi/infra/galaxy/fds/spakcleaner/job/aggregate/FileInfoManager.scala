@@ -18,6 +18,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.slf4j.LoggerFactory
 
 /**
   * Copyright 2017, Xiaomi.
@@ -25,6 +26,7 @@ import org.apache.spark.storage.StorageLevel
   * Author: haxiaolin@xiaomi.com
   */
 class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig) extends Serializable {
+    val LOG = LoggerFactory.getLogger(classOf[FileInfoManager])
     val archiveBucketName = FDSConfigKeys.GALAXY_FDS_CLEANER_ARCHIVE_BUCKET_NAME_DEFAULT
     val fileTable: String = TableHelper.getWholeTableName(config.hbase_cluster_name, "galaxy_blobstore_hadoop_fileinfo")
     val b_hbase_configurations = serializeBroudcastConfigurationBytes()
@@ -42,11 +44,10 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
         conf
     }
 
-    def getFileStatus(file_id: Long, list: Vector[FDSObjectInfoBean]): (FdsFileStatus, List[FDSObjectHDFSWrapper]) = {
+    def getFileStatus(file_id: Long, list: Vector[FDSObjectInfoBean],fileInfoDao: FileInfoDao,fileSystem: FileSystem): Option[(FdsFileStatus, List[FDSObjectHDFSWrapper])] = {
         import util.control.Breaks._
         var allBeanArchived = true
         var remainSize: Long = 0L
-        val hbase_cluster_confguration = deserializeHbaseConfiguration()
         for (info <- list) {
             breakable {
                 if (info.objectKey.startsWith(archiveBucketName + "/"))
@@ -55,19 +56,14 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
                 remainSize += info.blobInfo.length
             }
         }
-        hbase_cluster_confguration.set("hbase.cluster.name", config.hbase_cluster_name)
-        hbase_cluster_confguration.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
-        hbase_cluster_confguration.set(TableInputFormat.INPUT_TABLE, fileTable)
-        val client = new HBaseClient(hbase_cluster_confguration)
-        val fileInfoDao = new FileInfoDao(client)
-        //fileInfoDao.getFile(file_id) maybe null,should skip null
-        val path = fileInfoDao.getFile(file_id).getPath()
-
+        val fileInfo = fileInfoDao.getFile(file_id)
+        if(fileInfo == null || fileInfo.getPath == null)
+            return None
+        val path = fileInfo.getPath
         val fileStatus = if (allBeanArchived) {
             FdsFileStatus(file_id, -1, Long.MaxValue, path.toString, false)
         } else {
-            val fs = FileSystem.get(sc.hadoopConfiguration)
-            val status = fs.getFileStatus(path)
+            val status = fileSystem.getFileStatus(path)
             val totalSize = status.getLen
             val emptyPercent = if (totalSize == 0) -1 else ((totalSize - remainSize) * 100 / totalSize).toInt
             FdsFileStatus(file_id, emptyPercent, remainSize, path.toString, false)
@@ -78,19 +74,35 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
                 val metaRowKey = file_id.toString + HBaseAggregatedFileMetaDao.KEY_DELIMITER + bean.blobInfo.blobId
                 FDSObjectHDFSWrapper(metaRowKey, bean.objectKey, bean.blobInfo.start, bean.blobInfo.length)
             }).toList
-        (fileStatus, hbaseObjectList)
+        Some(fileStatus, hbaseObjectList)
     }
 
     def doComp(source: RDD[(Long, FDSObjectInfoBean)]): RDD[(FdsFileStatus, List[FDSObjectHDFSWrapper])] = {
         val file_status_rdd = source
             .groupByKey()
-            .map { case (key, objectList) => {
-                val (fileStatus, fdsObjectList) = getFileStatus(key, objectList.toVector)
-                (fileStatus, fdsObjectList)
-            }
-            }
-            .persist(StorageLevel.MEMORY_AND_DISK)
+            .mapPartitions(it=>{
+                val hbase_cluster_confguration = deserializeHbaseConfiguration()
+                hbase_cluster_confguration.set("hbase.cluster.name", config.hbase_cluster_name)
+                hbase_cluster_confguration.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
+                hbase_cluster_confguration.set(TableInputFormat.INPUT_TABLE, fileTable)
+                val client = new HBaseClient(hbase_cluster_confguration)
+                val fs = FileSystem.get(sc.hadoopConfiguration)
+                val fileInfoDao = new FileInfoDao(client)
+                it.map{
+                    case (key, objectList) => {
+                        try{
+                            val fileStatusOption= getFileStatus(key, objectList.toVector,fileInfoDao,fs)
+                            fileStatusOption
+                        }catch {
+                            case e:Exception=>{
+                                LOG.error("Error when getFileStatus,Exception:",e)
+                                None
+                            }
+                        }
+                    }
+                }.filter(_.isDefined)
+                .map(_.get)
+            })
         file_status_rdd
     }
-
 }
