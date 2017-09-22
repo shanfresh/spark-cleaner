@@ -60,13 +60,13 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
         hbase_cluster_confguration.set(TableInputFormat.INPUT_TABLE, fileTable)
         val client = new HBaseClient(hbase_cluster_confguration)
         val fileInfoDao = new FileInfoDao(client)
-        val path: Path = fileInfoDao.getFile(file_id).getPath
+        //fileInfoDao.getFile(file_id) maybe null,should skip null
+        val path = fileInfoDao.getFile(file_id).getPath()
 
         val fileStatus = if (allBeanArchived) {
             FdsFileStatus(file_id, -1, Long.MaxValue, path.toString, false)
         } else {
             val fs = FileSystem.get(sc.hadoopConfiguration)
-            val path = CleanerUtils.formatFilePath(file_id, sc.hadoopConfiguration)
             val status = fs.getFileStatus(path)
             val totalSize = status.getLen
             val emptyPercent = if (totalSize == 0) -1 else ((totalSize - remainSize) * 100 / totalSize).toInt
