@@ -44,7 +44,7 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
         conf
     }
 
-    def getFileStatus(file_id: Long, list: Vector[FDSObjectInfoBean],fileInfoDao: FileInfoDao,fileSystem: FileSystem): Option[(FdsFileStatus, List[FDSObjectHDFSWrapper])] = {
+    private def getFileStatus(file_id: Long, list: Vector[FDSObjectInfoBean],fileInfoDao: FileInfoDao,fileSystem: FileSystem): Option[(FdsFileStatus, List[FDSObjectHDFSWrapper])] = {
         import util.control.Breaks._
         var allBeanArchived = true
         var remainSize: Long = 0L
@@ -78,15 +78,21 @@ class FileInfoManager(@transient sc: SparkContext, config: FDSCleanerBasicConfig
     }
 
     def doComp(source: RDD[(Long, FDSObjectInfoBean)]): RDD[(FdsFileStatus, List[FDSObjectHDFSWrapper])] = {
+        require(sc!=null, "SPARK CONTEXT SHOULD NOT BE NULL")
+        val b_hadoop_configuration_ser= sc.broadcast(WritableSerDerUtils.serialize(sc.hadoopConfiguration))
         val file_status_rdd = source
             .groupByKey()
             .mapPartitions(it=>{
-                val hbase_cluster_confguration = deserializeHbaseConfiguration()
-                hbase_cluster_confguration.set("hbase.cluster.name", config.hbase_cluster_name)
-                hbase_cluster_confguration.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
-                hbase_cluster_confguration.set(TableInputFormat.INPUT_TABLE, fileTable)
-                val client = new HBaseClient(hbase_cluster_confguration)
-                val fs = FileSystem.get(sc.hadoopConfiguration)
+                val hbase_cluster_configuration = deserializeHbaseConfiguration()
+                val hadoop_cluster_configuration = new Configuration()
+                require(hadoop_cluster_configuration!=null, "HADOOP CLUSTER CONTEXT SHOULD NOT BE NULL")
+
+                WritableSerDerUtils.deserialize(b_hadoop_configuration_ser.value,hadoop_cluster_configuration)
+                hbase_cluster_configuration.set("hbase.cluster.name", config.hbase_cluster_name)
+                hbase_cluster_configuration.set("galaxy.hbase.table.prefix", s"${TableHelper.getTablePrefix(config.hbase_cluster_name)}_")
+                hbase_cluster_configuration.set(TableInputFormat.INPUT_TABLE, fileTable)
+                val client = new HBaseClient(hbase_cluster_configuration)
+                val fs = FileSystem.get(hadoop_cluster_configuration)
                 val fileInfoDao = new FileInfoDao(client)
                 it.map{
                     case (key, objectList) => {
